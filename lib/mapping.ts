@@ -136,12 +136,15 @@ export const CATEGORY_NAMES: Record<string, string> = {
 
 export type Selector = { actions: string[]; mediums: string[] };
 
+/** Casse et espaces variables selon la façon dont la ligne a été saisie ou exportée. */
+const norm = (v: string) => v.trim().toLowerCase();
+
 export function matches(
   row: { action: string; medium: string },
   sel: Selector,
 ): boolean {
-  if (sel.actions.length > 0 && !sel.actions.includes(row.action)) return false;
-  if (sel.mediums.length > 0 && !sel.mediums.includes(row.medium)) return false;
+  if (sel.actions.length > 0 && !sel.actions.map(norm).includes(norm(row.action))) return false;
+  if (sel.mediums.length > 0 && !sel.mediums.map(norm).includes(norm(row.medium))) return false;
   return true;
 }
 
