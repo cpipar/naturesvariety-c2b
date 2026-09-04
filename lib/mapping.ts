@@ -33,6 +33,7 @@ export const WIDGET_OPEN = {
 /** Redirection online vers un site distributeur (delivery + click & collect). */
 export const REDIRECTION = {
   actions: [
+    'redirection_product',
     'redirect',
     'redirection',
     'click_retailer',
