@@ -122,14 +122,13 @@ export const PRODUCT_NAMES: Record<string, string> = {
  * Les 7 catégories de la landing Nature's Variety.
  */
 export const CATEGORY_NAMES: Record<string, string> = {
-  // Renseigner les identifiants réels de l'export, par exemple :
-  // '1411': 'All — No Grain',
-  // '1412': 'No Grain — Dog',
-  // '1413': 'No Grain — Cat',
-  // '1414': 'Healthy Grains — Dog',
-  // '1415': 'Wet — Dog',
-  // '1416': 'Healthy Grains — Cat',
-  // '1417': 'Wet — Cat',
+  '1411': 'All - No Grain',
+  '1412': 'Dog - No Grain',
+  '1413': 'Cat - No Grain',
+  '1414': 'Dog - Healthy Grains',
+  '1415': 'Cat - Healthy Grains',
+  '1416': 'Dog - Wetfood',
+  '1417': 'Cat - Wetfood',
 };
 
 /* ─────────────────────── Helpers utilisés par l'agrégation ─────────────── */
