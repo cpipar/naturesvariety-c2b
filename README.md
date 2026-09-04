@@ -1,41 +1,59 @@
 # Nature's Variety — Where to Buy Partner Dashboard
 
-Dashboard client en marque blanche, qui lit **directement le Google Sheet
-`natures_variety_event_aggregates`** et se met à jour tout seul.
+Dashboard client en marque blanche, qui lit le Google Sheet
+`natures_variety_event_aggregates` **via l'API Google Sheets** et se met à jour
+tout seul.
 
 ```
 Export auto C2B ──► Google Sheet ──► Vercel (ce projet) ──► URL client
-   (déjà en place)   (publié en CSV)   (relecture auto 15 min)
+   (déjà en place)     (privé)       (API Sheets, cache 15 min)
 ```
 
-Pas de base de données, pas de serveur à administrer, pas de redéploiement quand
-les données changent.
+Le Sheet reste **privé** : il est simplement partagé en lecture avec un compte
+de service Google. Pas de base de données, pas de serveur à administrer, pas de
+redéploiement quand les données changent.
+
+---
+
+## Configuration — deux variables
+
+Tout tient dans deux variables d'environnement :
+
+| Variable | Contenu |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | la clé du compte de service, **JSON complet** |
+| `GOOGLE_SHEET_ID` | l'identifiant du Sheet, entre `/d/` et `/edit` dans son URL |
+
+Le modèle complet, avec les options, est dans **`.env.example`**.
 
 ---
 
 ## Déploiement — les 4 étapes
 
-Compte le temps : **30 à 40 minutes la première fois**, 2 minutes les suivantes.
+Compte **20 à 30 minutes la première fois**, 2 minutes les suivantes.
 
-### Étape 1 — Rendre le Sheet lisible par le dashboard
+### Étape 1 — Créer le compte de service et lui donner accès au Sheet
 
 C'est la seule étape où l'on peut se tromper. Prends ton temps.
 
-1. Ouvre le Sheet `natures_variety_event_aggregates`.
-2. **Fichier → Partager → Publier sur le web**.
-3. Premier menu déroulant : choisis **l'onglet précis** de l'export, pas
-   « Document entier ».
-4. Second menu : **Valeurs séparées par des virgules (.csv)**.
-5. **Publier**, confirme, puis **copie l'URL**. Elle ressemble à
-   `https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=0&single=true&output=csv`
-6. Mets-la de côté : c'est la valeur de `SHEET_CSV_URL` à l'étape 3.
+1. Va sur **console.cloud.google.com**, crée un projet (ou réutilise celui de
+   l'équipe).
+2. **APIs & Services → Library**, cherche **Google Sheets API**, clique
+   **Enable**. *Sans cette activation, toute lecture répond 403.*
+3. **IAM & Admin → Service Accounts → Create service account**. Un nom suffit
+   (`nv-dashboard`), aucun rôle IAM n'est nécessaire.
+4. Ouvre le compte créé → onglet **Keys** → **Add key → Create new key → JSON**.
+   Un fichier se télécharge : c'est la valeur de `GOOGLE_SERVICE_ACCOUNT_JSON`.
+5. Ouvre ce fichier, copie la valeur de **`client_email`** (elle ressemble à
+   `nv-dashboard@mon-projet.iam.gserviceaccount.com`).
+6. Ouvre le Sheet `natures_variety_event_aggregates` → **Partager** → colle
+   cette adresse → droit **Lecteur** → **Envoyer**.
+7. Dans l'URL du Sheet, copie la chaîne entre `/d/` et `/edit` : c'est
+   `GOOGLE_SHEET_ID`.
 
-> **Confidentialité.** « Publier sur le web » rend cette URL CSV accessible à qui
-> la possède — elle n'est pas indexée, mais elle n'est pas secrète. Pour des
-> stats de campagne c'est l'usage courant, et le dashboard lui-même est
-> protégeable par mot de passe (étape 4). Si le client refuse toute publication,
-> il faut passer par un compte de service Google Sheets API : dis-le moi, c'est
-> une variante d'une demi-heure.
+> **Le fichier JSON est un secret.** Il ne va jamais dans Git — `.gitignore`
+> l'exclut déjà. Uniquement dans `.env.local` en local, et dans les variables
+> d'environnement chiffrées de Vercel.
 
 **Le piège à vérifier :** le dashboard lit **un seul onglet**. Assure-toi que
 l'export automatique **ajoute ses lignes dans le même onglet** au fil du temps,
@@ -46,7 +64,7 @@ consolidation avec une formule du type
 =QUERY({'Aout'!A2:AB; 'Septembre'!A2:AB}; "select * where Col1 is not null")
 ```
 
-et publie **cet** onglet-là.
+et pointe `GOOGLE_SHEET_TAB` sur **cet** onglet-là.
 
 ### Étape 2 — Mettre le projet sur GitHub
 
@@ -76,10 +94,19 @@ contenu du dossier **sauf** `node_modules`, `.next` et `.env.local`.
 
 | Nom | Valeur |
 |---|---|
-| `SHEET_CSV_URL` | l'URL CSV copiée à l'étape 1 |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | tout le contenu du fichier JSON de l'étape 1 |
+| `GOOGLE_SHEET_ID` | l'identifiant copié à l'étape 1 |
 | `CLIENT_NAME` | `Nature's Variety` |
 | `CAMPAIGN_NAME` | `Grain-free range campaign · France` |
 | `REVALIDATE_SECONDS` | `900` |
+
+Colle le JSON tel quel, accolades comprises, dans le champ *Value* de Vercel :
+les retours à la ligne y sont acceptés. Si un outil intermédiaire les abîme,
+encode la clé en base64 — le dashboard accepte les deux formats :
+
+```bash
+base64 -i cle-du-compte-de-service.json | tr -d '\n'
+```
 
 5. **Deploy**. Au bout d'une minute tu as une URL en `.vercel.app`.
 
@@ -112,7 +139,8 @@ git push
 
 Vercel redéploie tout seul en une minute. L'URL ne change pas.
 
-**Les données** → rien à faire. L'export écrit dans le Sheet, le dashboard suit.
+**Les données** → rien à faire. L'export écrit dans le Sheet, le dashboard suit
+au bout de `REVALIDATE_SECONDS`.
 
 **Le nom du client, le mot de passe, la fréquence de rafraîchissement** →
 variables d'environnement Vercel, puis *Redeploy*.
@@ -164,33 +192,32 @@ Google Maps, ajoute-la dans `STORE_SELECTION` et le KPI se remplira.
 
 ---
 
-## Travailler en local (optionnel)
+## Travailler en local
 
 ```bash
 npm install
-cp .env.example .env.local     # puis renseigner SHEET_CSV_URL
+cp .env.example .env.local     # puis renseigner les deux variables Google
 npm run dev                    # http://localhost:3000
 ```
 
-Pour tester sans le Sheet, un extrait réel de l'export est fourni :
-
-```bash
-python3 -m http.server 8100     # dans ce dossier
-# puis dans .env.local :
-# SHEET_CSV_URL=http://127.0.0.1:8100/nv-export-sample.csv
-```
+Le fichier `nv-export-sample.csv` est un extrait réel de l'export : il sert de
+référence pour les noms de colonnes quand tu ajustes `lib/mapping.ts`, sans
+avoir à ouvrir le Sheet.
 
 ---
 
 ## Si le dashboard affiche « The data is not available »
 
-Le message sous le titre dit quoi corriger. Les trois causes classiques :
+Le message sous le titre dit quoi corriger. Les causes classiques :
 
 | Message | Cause | Correction |
 |---|---|---|
-| n'est pas lisible publiquement | Google renvoie une page de connexion | refaire l'étape 1 avec *Publier sur le web* |
-| a répondu 404 | mauvais `SHEET_ID` ou `SHEET_GID` | vérifier l'ID et le gid de l'onglet |
-| aucune ligne exploitable | mauvais onglet, ou en-têtes absents | publier l'onglet de l'export |
+| n'est pas configurée | variables absentes | renseigner `GOOGLE_SERVICE_ACCOUNT_JSON` et `GOOGLE_SHEET_ID`, puis redéployer |
+| pas accès à ce Sheet (403) | Sheet non partagé, ou API Sheets non activée | étape 1, points 2 et 6 |
+| authentification refusée (401) | clé révoquée ou tronquée | régénérer une clé JSON |
+| ce Sheet n'existe pas (404) | mauvais `GOOGLE_SHEET_ID` | reprendre la chaîne entre `/d/` et `/edit` |
+| plage refusée (400) | mauvais nom d'onglet | corriger `GOOGLE_SHEET_TAB` |
+| aucune ligne exploitable | mauvais onglet, ou en-têtes absents | le message liste les onglets du document |
 
 ---
 
@@ -203,8 +230,9 @@ app/
   login/                écran de mot de passe
   api/login|logout/     pose et retire le cookie d'accès
 lib/
+  google.ts             client API Google Sheets (compte de service, googleapis)
+  sheet.ts              lecture du Sheet, mapping des colonnes, cache mémoire
   mapping.ts            ⚠️ LE fichier de configuration des événements
-  sheet.ts              lecture et parsing du CSV Google Sheets
   aggregate.ts          calcul de tous les KPI et répartitions
   format.ts             formats de nombres, palettes, regroupement « Others »
 components/
@@ -214,13 +242,23 @@ components/
   BarList.tsx           barres classées
   PeriodFilter.tsx      filtre de période
 middleware.ts           protection par mot de passe
-nv-export-sample.csv    extrait réel de l'export, pour les tests en local
+.env.example            modèle des variables d'environnement
+nv-export-sample.csv    extrait réel de l'export, référence des colonnes
 ```
 
 ### Notes techniques
 
+L'accès aux données passe par **`googleapis`**, le client officiel Google pour
+Node : il gère seul l'obtention et le rafraîchissement du jeton OAuth du compte
+de service. Les colonnes sont retrouvées **par leur nom**, pas par leur
+position : ajouter ou déplacer une colonne dans l'export ne casse rien.
+
+Le résultat est gardé en mémoire pendant `REVALIDATE_SECONDS`, parce que la page
+est rendue à la demande (elle dépend de la période choisie) — sans ce cache, on
+interrogerait l'API à chaque affichage.
+
 Aucune librairie de graphiques : tout est du SVG écrit à la main. Le site reste
-très léger et il n'y a pas de dépendance à mettre à jour.
+très léger.
 
 Les couleurs des graphiques ont été validées pour rester distinguables en cas de
 daltonisme et suffisamment contrastées, en thème clair **comme** en thème sombre

@@ -1,0 +1,19 @@
+# Dépendances
+node_modules/
+
+# Build Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Variables d'environnement — la clé du compte de service ne doit jamais être commitée
+.env
+.env.local
+.env*.local
+*service-account*.json
+
+# Divers
+.DS_Store
+.vercel
+npm-debug.log*

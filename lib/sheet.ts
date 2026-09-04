@@ -1,10 +1,23 @@
+import {
+  ConfigError,
+  SheetsError,
+  isAuthFailure,
+  isConfigured,
+  listTabs,
+  readValues,
+  sheetTab,
+  spreadsheetId,
+} from './google';
+
 /**
  * Lecture du Google Sheet natures_variety_event_aggregates.
  *
- * Le Sheet est lu en CSV, sans authentification : soit via l'URL de publication
- * web (SHEET_CSV_URL), soit via l'endpoint /export du Sheet (SHEET_ID + SHEET_GID).
- * Next.js met le résultat en cache pendant REVALIDATE_SECONDS, donc le dashboard
- * se met à jour tout seul, sans redéploiement.
+ * Source unique : l'API Google Sheets, via le compte de service configuré dans
+ * GOOGLE_SERVICE_ACCOUNT_JSON. Le Sheet reste privé — il suffit de le partager
+ * en lecture avec l'adresse du compte de service.
+ *
+ * Le résultat est gardé en mémoire pendant REVALIDATE_SECONDS : le dashboard
+ * se met à jour tout seul, sans redéploiement et sans marteler l'API.
  */
 
 export type EventRow = {
@@ -33,34 +46,7 @@ export type SheetResult =
   | { ok: true; rows: EventRow[]; fetchedAt: string }
   | { ok: false; error: string; hint: string };
 
-/* ─────────────────────────── Parsing CSV ─────────────────────────── */
-
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
-      } else field += c;
-      continue;
-    }
-
-    if (c === '"') inQuotes = true;
-    else if (c === ',') { row.push(field); field = ''; }
-    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
-    else if (c !== '\r') field += c;
-  }
-
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
-  return rows.filter((r) => r.some((cell) => cell.trim() !== ''));
-}
+/* ─────────────────────────── Normalisation ─────────────────────────── */
 
 /** "utm_campaign", "UTM Campaign", "utm\_campaign" → "utmcampaign" */
 const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -149,77 +135,156 @@ export function mapRows(raw: string[][]): EventRow[] {
     .filter((r) => r.date !== '' && r.action !== '');
 }
 
-/* ─────────────────────────── Récupération ─────────────────────────── */
+/* ─────────────────── Cache mémoire ───────────────────
+   La page est rendue à la demande (elle dépend de la période choisie), donc
+   sans ce cache on interrogerait l'API à chaque affichage. */
+let cache: { rows: EventRow[]; fetchedAt: number } | null = null;
 
-export function sheetCsvUrl(): string | null {
-  const direct = process.env.SHEET_CSV_URL?.trim();
-  if (direct) return direct;
+/** 0 est une valeur légitime : elle désactive le cache. */
+const ttlSeconds = (): number => {
+  const raw = process.env.REVALIDATE_SECONDS?.trim();
+  if (!raw) return 900;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 900;
+};
 
-  const id = process.env.SHEET_ID?.trim();
-  if (!id) return null;
-  const gid = process.env.SHEET_GID?.trim() || '0';
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
-}
+/* ─────────────────────────── Point d'entrée ─────────────────────────── */
 
 export async function fetchEvents(): Promise<SheetResult> {
-  const url = sheetCsvUrl();
-  if (!url) {
+  if (cache && (Date.now() - cache.fetchedAt) / 1000 < ttlSeconds()) {
     return {
-      ok: false,
-      error: 'Aucune source de données configurée.',
-      hint: 'Renseigner SHEET_CSV_URL (ou SHEET_ID) dans les variables d’environnement Vercel.',
+      ok: true,
+      rows: cache.rows,
+      fetchedAt: new Date(cache.fetchedAt).toISOString(),
     };
   }
 
-  const revalidate = Number(process.env.REVALIDATE_SECONDS ?? 900) || 900;
+  const result = await readSheet();
+  if (result.ok) cache = { rows: result.rows, fetchedAt: Date.now() };
+  return result;
+}
 
-  let res: Response;
+async function readSheet(): Promise<SheetResult> {
+  if (!isConfigured()) {
+    return {
+      ok: false,
+      error: 'La connexion au Google Sheet n’est pas configurée.',
+      hint:
+        'Renseigner GOOGLE_SERVICE_ACCOUNT_JSON (la clé JSON du compte de service) ' +
+        'et GOOGLE_SHEET_ID (l’identifiant du Sheet) dans les variables d’environnement.',
+    };
+  }
+
+  const id = spreadsheetId() as string;
+
+  let raw: string[][];
   try {
-    res = await fetch(url, {
-      next: { revalidate },
-      headers: { 'user-agent': 'nv-wtb-dashboard' },
-    });
-  } catch {
-    return {
-      ok: false,
-      error: 'Le Google Sheet n’a pas pu être contacté.',
-      hint: 'Vérifier l’URL configurée et que le Sheet est accessible sans connexion.',
-    };
+    raw = await readValues(id, sheetTab());
+  } catch (e) {
+    return failure(e);
   }
 
-  if (!res.ok) {
-    return {
-      ok: false,
-      error: `Le Google Sheet a répondu ${res.status}.`,
-      hint:
-        'Le Sheet doit être publié sur le web en CSV, ou partagé en lecture avec ' +
-        '« Tous les utilisateurs disposant du lien ».',
-    };
-  }
-
-  const text = await res.text();
-
-  if (/^\s*<(!doctype|html)/i.test(text)) {
-    return {
-      ok: false,
-      error: 'Le Google Sheet n’est pas lisible publiquement.',
-      hint:
-        'Google a renvoyé une page de connexion au lieu du CSV. Publier l’onglet ' +
-        'sur le web (Fichier → Partager → Publier sur le web → CSV) et utiliser cette URL.',
-    };
-  }
-
-  const rows = mapRows(parseCsv(text));
+  const rows = mapRows(raw);
 
   if (rows.length === 0) {
+    let tabs: string[] = [];
+    try {
+      tabs = await listTabs(id);
+    } catch {
+      /* Le diagnostic est optionnel : sans lui, le message reste utile. */
+    }
+
     return {
       ok: false,
       error: 'Le Sheet a été lu, mais aucune ligne exploitable n’a été trouvée.',
       hint:
-        'Vérifier que l’onglet lu (SHEET_GID) est celui de l’export et qu’il contient ' +
-        'les colonnes timestamp, count, action et medium.',
+        'Vérifier que l’onglet lu est celui de l’export et qu’il contient les colonnes ' +
+        'timestamp, count, action et medium. ' +
+        (tabs.length > 0
+          ? `Onglets du document : ${tabs.join(', ')} — préciser lequel via GOOGLE_SHEET_TAB.`
+          : 'Préciser l’onglet via GOOGLE_SHEET_TAB.'),
     };
   }
 
   return { ok: true, rows, fetchedAt: new Date().toISOString() };
+}
+
+/** Traduit une erreur d'API en message actionnable pour l'écran d'erreur. */
+function failure(e: unknown): SheetResult {
+  /* Erreur de notre côté : variable absente ou mal formée. */
+  if (e instanceof ConfigError) {
+    return {
+      ok: false,
+      error: 'La clé du compte de service est inutilisable.',
+      hint: e.message,
+    };
+  }
+
+  const err = e instanceof SheetsError ? e : null;
+  const status = err?.status;
+
+  /* Google renvoie ces refus OAuth avec un statut 400 : c'est bien
+     l'authentification qui échoue, pas la requête. */
+  if (err && isAuthFailure(err.message)) {
+    return {
+      ok: false,
+      error: 'Google a refusé la clé du compte de service.',
+      hint:
+        'Le compte de service a peut-être été supprimé, ou sa clé révoquée. ' +
+        'Régénérer une clé JSON dans la console Google Cloud et remplacer ' +
+        `GOOGLE_SERVICE_ACCOUNT_JSON. Détail : ${err.message}`,
+    };
+  }
+
+  if (status === 401) {
+    return {
+      ok: false,
+      error: 'Google a refusé l’authentification du compte de service.',
+      hint:
+        'La clé est peut-être révoquée ou tronquée. Régénérer une clé JSON dans la console ' +
+        'Google Cloud et remplacer GOOGLE_SERVICE_ACCOUNT_JSON.',
+    };
+  }
+
+  if (status === 403) {
+    return {
+      ok: false,
+      error: 'Le compte de service n’a pas accès à ce Sheet.',
+      hint:
+        'Partager le Google Sheet en lecture avec l’adresse du compte de service ' +
+        '(client_email de la clé JSON), et activer l’API Google Sheets sur le projet Google Cloud.',
+    };
+  }
+
+  if (status === 404) {
+    return {
+      ok: false,
+      error: 'Ce Sheet n’existe pas, ou l’identifiant est faux.',
+      hint: 'GOOGLE_SHEET_ID est la chaîne entre /d/ et /edit dans l’URL du Sheet.',
+    };
+  }
+
+  if (status === 400) {
+    return {
+      ok: false,
+      error: 'La plage demandée est refusée par Google.',
+      hint: 'Vérifier GOOGLE_SHEET_TAB : il doit reprendre le nom exact de l’onglet.',
+    };
+  }
+
+  if (status === 429 || (status !== undefined && status >= 500)) {
+    return {
+      ok: false,
+      error: 'L’API Google Sheets est momentanément indisponible.',
+      hint: 'Réessayer dans quelques minutes. Aucune action n’est nécessaire.',
+    };
+  }
+
+  return {
+    ok: false,
+    error: 'La lecture du Sheet a échoué.',
+    hint: err?.message
+      ? `Détail renvoyé par Google : ${err.message}`
+      : 'Vérifier GOOGLE_SERVICE_ACCOUNT_JSON et GOOGLE_SHEET_ID.',
+  };
 }
