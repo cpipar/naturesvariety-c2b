@@ -16,7 +16,6 @@ export default function PeriodFilter({
   bounds,
   days,
   rowCount,
-  onExport,
 }: {
   period: Period | 'custom';
   from: string;
@@ -24,7 +23,6 @@ export default function PeriodFilter({
   bounds: { min: string; max: string };
   days: number;
   rowCount: number;
-  onExport: () => void;
 }) {
   const router = useRouter();
   const [a, setA] = useState(from);
@@ -88,9 +86,6 @@ export default function PeriodFilter({
           <br />
           {fmt(rowCount)} event rows
         </span>
-        <button className="linkbtn" type="button" onClick={onExport}>
-          Export
-        </button>
       </div>
     </section>
   );

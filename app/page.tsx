@@ -23,7 +23,7 @@ export default async function Page({
         <header className="topbar">
           <div className="brandlock">
             <span className="wordmark">{clientName}</span>
-            <span className="topbar__what">Where to Buy &mdash; Partner Dashboard</span>
+            <span className="topbar__what">Click2Buy - Partner Dashboard</span>
           </div>
         </header>
         <div className="errorwrap">

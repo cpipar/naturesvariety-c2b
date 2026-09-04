@@ -1,5 +1,6 @@
 const nf = new Intl.NumberFormat('en-US');
-const cf = new Intl.NumberFormat('en-US', {
+/* European client: amount before the symbol, e.g. "24 600 €" rather than "€24,600". */
+const cf = new Intl.NumberFormat('fr-FR', {
   style: 'currency',
   currency: 'EUR',
   maximumFractionDigits: 0,
@@ -16,7 +17,7 @@ export const pctText = (v: number) => (v >= 10 ? v.toFixed(0) : v.toFixed(1)) + 
 export const centerText = (v: number, money: boolean) =>
   money
     ? Math.abs(v) >= 10000
-      ? '€' + kf.format(v)
+      ? kf.format(v) + ' €'
       : eur(v)
     : Math.abs(v) >= 100000
       ? kf.format(v)

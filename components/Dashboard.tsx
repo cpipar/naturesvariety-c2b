@@ -22,7 +22,7 @@ const UTM_LABEL: Record<MetricKey, string> = {
   landing: 'landing page visits',
   button: 'button views',
   click: 'widget openings',
-  redirect: 'redirections',
+  redirect: 'online redirections',
   store: 'store selections',
   revenue: 'engaged revenue',
 };
@@ -57,22 +57,6 @@ export default function Dashboard({
   const t = data.totals;
   const intent = t.redirect + t.store;
 
-  const exportCsv = () => {
-    const head =
-      'date,landing_page_visits,button_views,widget_openings,online_redirections,' +
-      'store_selections,engaged_revenue_eur';
-    const body = data.daily
-      .map((d) => [d.date, d.landing, d.button, d.click, d.redirect, d.store, d.revenue].join(','))
-      .join('\n');
-    const blob = new Blob(['﻿' + head + '\n' + body], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `natures-variety-wtb-${data.dateFrom}-to-${data.dateTo}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
   const funnelSteps = [
     { name: 'Where-to-buy button views', value: t.button, of: null as string | null },
     { name: 'Widget openings', value: t.click, of: 'button views' },
@@ -100,7 +84,7 @@ export default function Dashboard({
             <span className="wordmark">{clientName}</span>
           )}
           <span className="topbar__what">
-            Where to Buy &mdash; Partner Dashboard
+            Click2Buy - Partner Dashboard
             {campaignName ? <span>{campaignName}</span> : null}
           </span>
         </div>
@@ -121,7 +105,6 @@ export default function Dashboard({
           bounds={bounds}
           days={data.days}
           rowCount={data.rowCount}
-          onExport={exportCsv}
         />
 
         {/* ═══ OVERVIEW ═══ */}
@@ -295,6 +278,7 @@ export default function Dashboard({
                 <Donut
                   items={data.redirectByRetailer[service]}
                   label={SHORT.redirect}
+                  limit={99}
                   empty="No redirection recorded for this service over the period."
                 />
               </div>
@@ -317,7 +301,10 @@ export default function Dashboard({
                 <div className="card__head">
                   <div>
                     <h3 className="card__title">Engaged revenue by retailer</h3>
-                    <p className="card__sub">Basket value carried into each retailer.</p>
+                    <p className="card__sub">
+                      Basket value carried into each retailer, online (delivery &amp; click
+                      &amp; collect).
+                    </p>
                   </div>
                 </div>
                 <Donut items={data.revenueByRetailer} label={SHORT.revenue} money />
@@ -463,9 +450,9 @@ export default function Dashboard({
             <div className="seg" role="group" aria-label="UTM metric">
               {(
                 [
-                  ['click', 'Widget openings'],
                   ['button', 'Button views'],
-                  ['redirect', 'Redirections'],
+                  ['click', 'Widget openings'],
+                  ['redirect', 'Online redirections'],
                   ['store', 'Store selections'],
                   ['revenue', 'Engaged revenue'],
                 ] as [MetricKey, string][]
