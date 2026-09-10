@@ -8,6 +8,7 @@ import {
   STORE_SELECTION,
   WIDGET_OPEN,
   categoryName,
+  clickProductId,
   matches,
   productName,
   serviceOf,
@@ -282,7 +283,7 @@ export function buildPayload(rows: EventRow[]): Payload {
     revenueByRetailer: group(redirectRows, (r) => r.retailerName, byAmount),
     categories: group(categoryRows, (r) => categoryName(r.landingcategory, r.mediumId), byCount),
     products: {
-      click: group(clickRows, (r) => productName(r.productId), byCount),
+      click: group(clickRows, (r) => productName(clickProductId(r.productId, r.mediumId)), byCount),
       redirect: group(redirectRows, (r) => productName(r.productId), byCount),
       revenue: group(redirectRows, (r) => productName(r.productId), byAmount),
     },
