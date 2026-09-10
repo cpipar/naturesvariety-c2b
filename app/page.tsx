@@ -5,6 +5,13 @@ import { fetchEvents } from '@/lib/sheet';
 
 export const revalidate = 900;
 
+/** Hier en UTC — la dernière journée dont les stats sont considérées complètes. */
+function yesterday(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function Page({
   searchParams,
 }: {
@@ -43,15 +50,23 @@ export default async function Page({
   const bounds = { min: dates[0] ?? '', max: dates[dates.length - 1] ?? '' };
 
   const hasRange = typeof sp.from === 'string' && typeof sp.to === 'string';
-  const period: Period = isPeriod(sp.p) ? sp.p : 'all';
+  const hasPeriod = isPeriod(sp.p);
+  const period: Period = hasPeriod ? (sp.p as Period) : 'all';
 
-  const rows = filterRows(all, hasRange ? { from: sp.from, to: sp.to } : { period });
+  /* Sans période ni plage choisie explicitement, le dashboard s'ouvre toujours
+     sur le premier jour de la campagne jusqu'à hier — jamais "aujourd'hui",
+     dont les stats de la journée ne sont pas encore complètes. */
+  const rows = hasRange
+    ? filterRows(all, { from: sp.from, to: sp.to })
+    : hasPeriod
+      ? filterRows(all, { period })
+      : filterRows(all, { from: DATA_START_DATE, to: yesterday() });
   const data = buildPayload(rows.length > 0 ? rows : all);
 
   return (
     <Dashboard
       data={data}
-      period={hasRange ? 'custom' : period}
+      period={hasRange || !hasPeriod ? 'custom' : period}
       clientName={clientName}
       campaignName={campaignName}
       logo={logo}
