@@ -1,7 +1,6 @@
 import type { EventRow } from './sheet';
 import {
   BUTTON_VIEW,
-  INTERNAL_ACTIONS,
   LANDING_VIEW,
   REDIRECTION,
   RETAILER_DISPLAY,
@@ -9,6 +8,7 @@ import {
   WIDGET_OPEN,
   categoryName,
   clickProductId,
+  internalActionLabel,
   matches,
   productName,
   serviceOf,
@@ -190,12 +190,8 @@ export function buildPayload(rows: EventRow[]): Payload {
     ),
   };
 
-  /* Actions internes : la clé peut venir de `action` ou de `tab` */
-  const internal = group(
-    rows,
-    (r) => INTERNAL_ACTIONS[r.action] ?? INTERNAL_ACTIONS[r.tab] ?? '',
-    byCount,
-  );
+  /* Actions internes : certaines se distinguent par `tab` ou `retailOutletService` */
+  const internal = group(rows, internalActionLabel, byCount);
 
   /* Efficacité enseigne : choisie une fois montrée */
   const displayed = group(

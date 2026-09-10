@@ -76,27 +76,16 @@ export const RETAILER_DISPLAY = {
 };
 
 /**
- * Actions internes au widget. Clé = valeur de `action` (ou de `tab` quand
- * l'action est un changement d'onglet), valeur = libellé affiché.
- * Les 5 seules actions internes de cette campagne.
+ * Actions internes au widget, en dehors de l'entonnoir principal. Certaines
+ * de ces actions ne se distinguent pas par leur nom mais par la colonne
+ * `tab` ou `retailOutletService` de la même ligne — voir internalActionLabel
+ * plus bas, qui porte la logique complète.
+ *
+ *   tab_title_click        + tab=store/drive/delivery   → quel onglet ouvert
+ *   map_usage                                           → carte ouverte
+ *   no_retail_outlet_found + retailOutletService=…       → aucune enseigne trouvée
+ *   list_info_button_click                              → bouton infos magasin
  */
-export const INTERNAL_ACTIONS: Record<string, string> = {
-  // Onglets — selon l'export, ce sera soit une action dédiée, soit `tab`
-  tab_delivery: 'Delivery tab',
-  tab_click_and_collect: 'Click & collect tab',
-  tab_stores: 'Physical stores tab',
-  delivery: 'Delivery tab',
-  drive: 'Click & collect tab',
-  click_and_collect: 'Click & collect tab',
-  stores: 'Physical stores tab',
-  physical: 'Physical stores tab',
-  // Clics supplémentaires
-  complementary_product: 'Complementary product click',
-  click_complementary: 'Complementary product click',
-  store_info: 'Store info button',
-  info_button: 'Store info button',
-  print_info: 'Store info button',
-};
 
 /**
  * Type de service par valeur de `retailOutletService`, pour le filtre
@@ -398,6 +387,37 @@ export function matches(
   if (sel.actions.length > 0 && !sel.actions.map(norm).includes(norm(row.action))) return false;
   if (sel.mediums.length > 0 && !sel.mediums.map(norm).includes(norm(row.medium))) return false;
   return true;
+}
+
+/** Libellé d'une action interne au widget — voir le vocabulaire plus haut. */
+export function internalActionLabel(row: {
+  action: string;
+  tab: string;
+  retailOutletService: string;
+}): string {
+  const action = norm(row.action);
+
+  if (action === 'tab_title_click') {
+    const tab = norm(row.tab);
+    if (tab === 'store') return 'Physical stores tab';
+    if (tab === 'drive') return 'Click & collect tab';
+    if (tab === 'delivery') return 'Delivery tab';
+    return '';
+  }
+
+  if (action === 'map_usage') return 'Map opened';
+
+  if (action === 'no_retail_outlet_found') {
+    const service = norm(row.retailOutletService);
+    if (service === 'store') return 'No physical store found';
+    if (service === 'drive') return 'No click & collect found';
+    if (service === 'delivery') return 'No delivery found';
+    return 'No retailer found';
+  }
+
+  if (action === 'list_info_button_click') return 'Store info button';
+
+  return '';
 }
 
 export function serviceOf(raw: string): 'delivery' | 'collect' | 'unknown' {

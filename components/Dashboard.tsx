@@ -381,12 +381,12 @@ export default function Dashboard({
                     <h3 className="card__title">Widget internal actions</h3>
                     <p className="card__sub">
                       What shoppers did inside the widget, outside the main funnel: which
-                      buying option they switched to, and the two extra clicks available
-                      to them.
+                      tab they switched to, the map and store info button, and the
+                      searches that came back with no retailer.
                     </p>
                   </div>
                 </div>
-                <BarList items={data.internal} limit={6} />
+                <BarList items={data.internal} limit={10} />
               </div>
             )}
 
