@@ -12,6 +12,14 @@
    dans l'export sont simplement ignorés, sans casser le dashboard.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Le dashboard ignore tout ce qui précède cette date : les lignes plus
+ * anciennes de natures_variety_event_aggregates (rodage, tests) ne comptent
+ * pas. Tout ce qui s'ajoute à l'export auto à partir de cette date, jour
+ * après jour, est pris en compte automatiquement — pas de borne haute.
+ */
+export const DATA_START_DATE = '2026-09-07';
+
 /** Visites de la landing page (page d'accueil + pages catégorie). */
 export const LANDING_VIEW = {
   actions: ['print'],

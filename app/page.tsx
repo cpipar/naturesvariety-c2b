@@ -1,5 +1,6 @@
 import Dashboard from '@/components/Dashboard';
 import { buildPayload, filterRows, isPeriod, type Period } from '@/lib/aggregate';
+import { DATA_START_DATE } from '@/lib/mapping';
 import { fetchEvents } from '@/lib/sheet';
 
 export const revalidate = 900;
@@ -37,7 +38,7 @@ export default async function Page({
     );
   }
 
-  const all = result.rows;
+  const all = result.rows.filter((r) => r.date >= DATA_START_DATE);
   const dates = all.map((r) => r.date).sort();
   const bounds = { min: dates[0] ?? '', max: dates[dates.length - 1] ?? '' };
 
