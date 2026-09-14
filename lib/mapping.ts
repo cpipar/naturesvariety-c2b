@@ -434,8 +434,13 @@ export function clickProductId(productId: string, mediumId: string): string {
   return productId || WIDGET_PRODUCT_ID[mediumId] || '';
 }
 
+/**
+ * Une valeur qui n'est pas une des 7 catégories connues (test, filtre annexe,
+ * anomalie de l'export…) est ignorée plutôt qu'affichée telle quelle : ce
+ * graphique ne montre que les vraies catégories de la landing.
+ */
 export function categoryName(landingcategory: string, mediumId: string): string {
   const raw = landingcategory || mediumId;
   if (!raw) return '';
-  return CATEGORY_NAMES[raw] ?? (/^\d+$/.test(raw) ? `Category ${raw}` : raw);
+  return CATEGORY_NAMES[raw] ?? '';
 }
