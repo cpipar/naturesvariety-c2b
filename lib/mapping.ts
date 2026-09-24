@@ -394,8 +394,15 @@ export function internalActionLabel(row: {
   action: string;
   tab: string;
   retailOutletService: string;
+  originWidgetId: string;
 }): string {
   const action = norm(row.action);
+
+  /* Une ouverture de widget avec originWidgetId renseigné n'est pas une
+     ouverture depuis la landing : c'est un clic sur un produit complémentaire
+     depuis un autre widget (mediumId porte alors le widget du produit
+     complémentaire ouvert). */
+  if (row.originWidgetId) return 'Complementary product click';
 
   if (action === 'tab_title_click') {
     const tab = norm(row.tab);

@@ -27,6 +27,7 @@ export type EventRow = {
   action: string;
   medium: string;
   mediumId: string;
+  originWidgetId: string;
   productId: string;
   referrer: string;
   tab: string;
@@ -92,6 +93,7 @@ export function mapRows(raw: string[][]): EventRow[] {
     action: idx('action'),
     medium: idx('medium'),
     mediumId: idx('mediumid'),
+    originWidgetId: idx('originwidgetid'),
     productId: idx('productid'),
     referrer: idx('referrer'),
     tab: idx('tab'),
@@ -118,6 +120,7 @@ export function mapRows(raw: string[][]): EventRow[] {
       action: STR(at(r, c.action)),
       medium: STR(at(r, c.medium)),
       mediumId: STR(at(r, c.mediumId)),
+      originWidgetId: STR(at(r, c.originWidgetId)),
       productId: STR(at(r, c.productId)),
       referrer: STR(at(r, c.referrer)),
       tab: STR(at(r, c.tab)),
