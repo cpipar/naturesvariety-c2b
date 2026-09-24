@@ -1,18 +1,22 @@
 import { Bucket, RAMP, eur, fmt, fold, pct, pctText } from '@/lib/format';
 
 /**
- * Ranked horizontal bars, one hue getting darker with magnitude. The value and
- * the share are always written out, so nothing depends on colour.
+ * Ranked horizontal bars, one hue getting darker with magnitude. The value is
+ * always written out; the share of the list total is shown only when the
+ * rows are actually parts of one whole (`showShare`) — for unrelated event
+ * types, a "% of this list" figure doesn't mean anything.
  */
 export default function BarList({
   items,
   limit = 8,
   money = false,
+  showShare = false,
   empty = 'Nothing recorded over this period.',
 }: {
   items: Bucket[];
   limit?: number;
   money?: boolean;
+  showShare?: boolean;
   empty?: string;
 }) {
   const rows = fold(items, limit).map((r) => ({ ...r, value: Math.round(r.value) }));
@@ -31,7 +35,7 @@ export default function BarList({
             </span>
             <span className="bar__value">
               {money ? eur(r.value) : fmt(r.value)}
-              <i>{pctText(pct(r.value, sum))}</i>
+              {showShare && <i>{pctText(pct(r.value, sum))}</i>}
             </span>
           </div>
           <div className="bar__track">
