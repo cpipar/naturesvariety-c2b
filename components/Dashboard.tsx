@@ -145,9 +145,9 @@ export default function Dashboard({
             <div className="kpi kpi--rate">
               <span className="kpi__step">Outcome</span>
               <span className="kpi__name">Engagement rate</span>
-              <span className="kpi__value">{pctText(pct(t.redirect, t.click))}</span>
+              <span className="kpi__value">{pctText(pct(intent, t.click))}</span>
               <span className="kpi__note">
-                {fmt(t.redirect)} redirections / {fmt(t.click)} openings
+                {fmt(intent)} redirections + store selections / {fmt(t.click)} openings
               </span>
             </div>
             <div className="kpi kpi--money">
