@@ -66,6 +66,15 @@ consolidation avec une formule du type
 
 et pointe `GOOGLE_SHEET_TAB` sur **cet** onglet-là.
 
+**Si l'export atteint la limite de cellules d'un Google Sheet** (ça arrive sur
+une longue campagne), l'export auto bascule généralement sur un nouveau
+document qui continue la collecte. Le Sheet d'origine reste la source
+principale (`GOOGLE_SHEET_ID` ne change pas) — il suffit d'ajouter le nouveau
+document en plus, pas de le remplacer : partage-le en lecture avec le même
+compte de service, puis renseigne son identifiant dans
+`GOOGLE_EXTRA_SHEET_IDS` (voir `.env.example`). Le dashboard lit les deux
+Sheets et fusionne leurs lignes automatiquement.
+
 ### Étape 2 — Mettre le projet sur GitHub
 
 Crée d'abord un dépôt **vide et privé** sur github.com (bouton *New

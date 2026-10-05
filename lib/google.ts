@@ -104,6 +104,33 @@ export function sheetTab(): string {
   return process.env.GOOGLE_SHEET_TAB?.trim() || '';
 }
 
+/**
+ * Feuilles supplémentaires : quand un Sheet atteint la limite de cellules de
+ * Google Sheets, l'export auto bascule sur un nouveau document qui continue
+ * la collecte là où l'ancien s'est arrêté. Une entrée par ligne (ou séparée
+ * par une virgule), optionnellement suivie de `:nom de l'onglet` :
+ *
+ *   GOOGLE_EXTRA_SHEET_IDS="1wL2vd7K5zf2aZIL0_Ef_xyhQGe99KThiE0i-nQC1QoE"
+ *   GOOGLE_EXTRA_SHEET_IDS="idA:Feuille1,idB:Feuille1"
+ *
+ * Toutes les feuilles (principale + supplémentaires) sont lues et leurs
+ * lignes concaténées : rien d'autre dans le dashboard n'a besoin de savoir
+ * qu'il y en a plusieurs.
+ */
+export function extraSheets(): { id: string; tab: string }[] {
+  const raw = process.env.GOOGLE_EXTRA_SHEET_IDS?.trim();
+  if (!raw) return [];
+  return raw
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [id, tab = ''] = entry.split(':').map((s) => s.trim());
+      return { id, tab };
+    })
+    .filter((s) => s.id);
+}
+
 export const isConfigured = () =>
   Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() && spreadsheetId());
 

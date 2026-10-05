@@ -1,6 +1,7 @@
 import {
   ConfigError,
   SheetsError,
+  extraSheets,
   isAuthFailure,
   isConfigured,
   listTabs,
@@ -178,21 +179,26 @@ async function readSheet(): Promise<SheetResult> {
     };
   }
 
-  const id = spreadsheetId() as string;
+  const sheets = [{ id: spreadsheetId() as string, tab: sheetTab() }, ...extraSheets()];
 
-  let raw: string[][];
-  try {
-    raw = await readValues(id, sheetTab());
-  } catch (e) {
-    return failure(e);
+  let rows: EventRow[] = [];
+  for (const [i, sheet] of sheets.entries()) {
+    let raw: string[][];
+    try {
+      raw = await readValues(sheet.id, sheet.tab);
+    } catch (e) {
+      return failure(
+        e,
+        i === 0 ? undefined : `Feuille supplémentaire #${i} (${sheet.id}) : `,
+      );
+    }
+    rows = rows.concat(mapRows(raw));
   }
-
-  const rows = mapRows(raw);
 
   if (rows.length === 0) {
     let tabs: string[] = [];
     try {
-      tabs = await listTabs(id);
+      tabs = await listTabs(sheets[0].id);
     } catch {
       /* Le diagnostic est optionnel : sans lui, le message reste utile. */
     }
@@ -213,13 +219,13 @@ async function readSheet(): Promise<SheetResult> {
 }
 
 /** Traduit une erreur d'API en message actionnable pour l'écran d'erreur. */
-function failure(e: unknown): SheetResult {
+function failure(e: unknown, prefix = ''): SheetResult {
   /* Erreur de notre côté : variable absente ou mal formée. */
   if (e instanceof ConfigError) {
     return {
       ok: false,
       error: 'La clé du compte de service est inutilisable.',
-      hint: e.message,
+      hint: prefix + e.message,
     };
   }
 
@@ -233,6 +239,7 @@ function failure(e: unknown): SheetResult {
       ok: false,
       error: 'Google a refusé la clé du compte de service.',
       hint:
+        prefix +
         'Le compte de service a peut-être été supprimé, ou sa clé révoquée. ' +
         'Régénérer une clé JSON dans la console Google Cloud et remplacer ' +
         `GOOGLE_SERVICE_ACCOUNT_JSON. Détail : ${err.message}`,
@@ -244,6 +251,7 @@ function failure(e: unknown): SheetResult {
       ok: false,
       error: 'Google a refusé l’authentification du compte de service.',
       hint:
+        prefix +
         'La clé est peut-être révoquée ou tronquée. Régénérer une clé JSON dans la console ' +
         'Google Cloud et remplacer GOOGLE_SERVICE_ACCOUNT_JSON.',
     };
@@ -254,6 +262,7 @@ function failure(e: unknown): SheetResult {
       ok: false,
       error: 'Le compte de service n’a pas accès à ce Sheet.',
       hint:
+        prefix +
         'Partager le Google Sheet en lecture avec l’adresse du compte de service ' +
         '(client_email de la clé JSON), et activer l’API Google Sheets sur le projet Google Cloud.',
     };
@@ -263,7 +272,7 @@ function failure(e: unknown): SheetResult {
     return {
       ok: false,
       error: 'Ce Sheet n’existe pas, ou l’identifiant est faux.',
-      hint: 'GOOGLE_SHEET_ID est la chaîne entre /d/ et /edit dans l’URL du Sheet.',
+      hint: prefix + 'L’identifiant est la chaîne entre /d/ et /edit dans l’URL du Sheet.',
     };
   }
 
@@ -271,7 +280,7 @@ function failure(e: unknown): SheetResult {
     return {
       ok: false,
       error: 'La plage demandée est refusée par Google.',
-      hint: 'Vérifier GOOGLE_SHEET_TAB : il doit reprendre le nom exact de l’onglet.',
+      hint: prefix + 'Vérifier le nom de l’onglet : il doit reprendre le nom exact.',
     };
   }
 
@@ -279,15 +288,17 @@ function failure(e: unknown): SheetResult {
     return {
       ok: false,
       error: 'L’API Google Sheets est momentanément indisponible.',
-      hint: 'Réessayer dans quelques minutes. Aucune action n’est nécessaire.',
+      hint: prefix + 'Réessayer dans quelques minutes. Aucune action n’est nécessaire.',
     };
   }
 
   return {
     ok: false,
     error: 'La lecture du Sheet a échoué.',
-    hint: err?.message
-      ? `Détail renvoyé par Google : ${err.message}`
-      : 'Vérifier GOOGLE_SERVICE_ACCOUNT_JSON et GOOGLE_SHEET_ID.',
+    hint:
+      prefix +
+      (err?.message
+        ? `Détail renvoyé par Google : ${err.message}`
+        : 'Vérifier GOOGLE_SERVICE_ACCOUNT_JSON et GOOGLE_SHEET_ID.'),
   };
 }
