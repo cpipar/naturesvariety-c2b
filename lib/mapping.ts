@@ -392,17 +392,21 @@ export function matches(
 /** Libellé d'une action interne au widget — voir le vocabulaire plus haut. */
 export function internalActionLabel(row: {
   action: string;
+  medium: string;
   tab: string;
   retailOutletService: string;
   originWidgetId: string;
 }): string {
   const action = norm(row.action);
 
-  /* Une ouverture de widget avec originWidgetId renseigné n'est pas une
-     ouverture depuis la landing : c'est un clic sur un produit complémentaire
-     depuis un autre widget (mediumId porte alors le widget du produit
-     complémentaire ouvert). */
-  if (row.originWidgetId) return 'Complementary product click';
+  /* originWidgetId est repris par TOUS les événements qui se produisent dans
+     le widget complémentaire une fois ouvert (affichage enseignes, géoloc,
+     onglets…), pas seulement par son ouverture. Ne compter comme « clic sur
+     produit complémentaire » que l'ouverture elle-même (print/widget) : les
+     autres événements de ce widget gardent leur propre libellé ci-dessous. */
+  if (action === 'print' && norm(row.medium) === 'widget' && row.originWidgetId) {
+    return 'Complementary product click';
+  }
 
   if (action === 'tab_title_click') {
     const tab = norm(row.tab);
